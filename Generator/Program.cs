@@ -15,7 +15,7 @@ internal static class Program
     private static string repoMainBranch = null!;
     private static bool isDryRun;
 
-    private static readonly GitHubClient github = new(new Octokit.ProductHeaderValue("MelonLoader.UnityDependencies"));
+    private static readonly GitHubClient github = new(new Octokit.ProductHeaderValue("FusionCore.UnityDependencies"));
     
     private static readonly HttpClient http = new()
     {

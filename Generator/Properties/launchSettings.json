@@ -2,7 +2,7 @@
   "profiles": {
     "Generator": {
       "commandName": "Project",
-      "commandLineArgs": "LavaGang MelonLoader.UnityDependencies main"
+      "commandLineArgs": "All-Of-Us-Mods FusionCore.UnityDependencies main"
     }
   }
 }
