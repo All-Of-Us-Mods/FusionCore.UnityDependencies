@@ -47,14 +47,14 @@ internal static class Program
         http.DefaultRequestHeaders.Add("User-Agent", Config.UserAgent);
 
         Console.WriteLine("Fetching available releases");
-        var versions = await GetAvailableVersionsAsync();
+        var versions = await GetAvailableVersionsAsync(latestBuildsOnly: false);
 
         Console.WriteLine("Fetching existing releases");
         var releases = await github.Repository.Release.GetAll(repoOwner, repoName);
         
         foreach (var version in versions)
         {
-            if (releases.Any(x => x.TagName == version.ShortName))
+            if (releases.Any(x => x.TagName == version.ToString()))
                 continue;
 
             await ProcessVersionAsync(version);
@@ -106,19 +106,20 @@ internal static class Program
             
             var payloadPath = Path.Combine(tempDir, "Payload~");
             Console.WriteLine("Extracting the last one...");
-            await SevenZip.ExtractAsync(payloadPath, tempDir, true, "./Variations/il2cpp/Managed/*", "./Variations/il2cpp/Release/Libs/*");
+            await SevenZip.ExtractAsync(payloadPath, tempDir, true, "./Variations/il2cpp/Managed/*", "./Variations/il2cpp/Release/Libs/*", "./Variations/il2cpp/Release/Symbols/*");
             File.Delete(payloadPath);
             
             var managedDir = Path.Combine(tempDir, "Variations", "il2cpp", "Managed");
             var libsDir = Path.Combine(tempDir, "Variations", "il2cpp", "Release", "Libs");
+            var symbolsDir = Path.Combine(tempDir, "Variations", "il2cpp", "Release", "Symbols");
             
             Console.WriteLine("Bundling Managed.zip");
             using var managedZipStr = new MemoryStream();
-            using (var managedZip = new ZipArchive(managedZipStr, ZipArchiveMode.Create, true))
+            await using (var managedZip = new ZipArchive(managedZipStr, ZipArchiveMode.Create, true))
             {
                 foreach (var file in Directory.EnumerateFiles(managedDir, "*.dll"))
                 {
-                    managedZip.CreateEntryFromFile(file, Path.GetFileName(file));
+                    await managedZip.CreateEntryFromFileAsync(file, Path.GetFileName(file));
                 }
             }
             managedZipStr.Seek(0, SeekOrigin.Begin);
@@ -127,13 +128,13 @@ internal static class Program
             {
                 Console.WriteLine("Creating a new repo tag");
                 var commitSha = (await github.Repository.Branch.Get(repoOwner, repoName, repoMainBranch)).Commit.Sha;
-                await github.Git.Reference.Create(repoOwner, repoName, new($"refs/tags/{version.ShortName}", commitSha));
+                await github.Git.Reference.Create(repoOwner, repoName, new($"refs/tags/{version.ToString()}", commitSha));
 
                 // Create a draft release, upload all the assets and undraft it
                 Console.WriteLine("Creating a new repo draft release");
-                var release = await github.Repository.Release.Create(repoOwner, repoName, new(version.ShortName)
+                var release = await github.Repository.Release.Create(repoOwner, repoName, new(version.ToString())
                 {
-                    Name = version.ShortName,
+                    Name = version.ToString(),
                     Body = "Automatically generated and uploaded by the MelonLoader.UnityDependencies Generator",
                     Draft = true
                 });
@@ -153,6 +154,21 @@ internal static class Program
 
                     Console.WriteLine($"Uploading {assetName}");
                     await using var assetStr = File.OpenRead(libunityPath);
+                    await github.Repository.Release.UploadAsset(release, new(assetName, "application/x-msdownload", assetStr, TimeSpan.FromMinutes(10)));
+                }
+                
+                foreach (var dir in Directory.EnumerateDirectories(symbolsDir))
+                {
+                    var libunitySymPath = Path.Combine(dir, "libunity.sym.so");
+                    if (!File.Exists(libunitySymPath))
+                        continue;
+
+                    var arch = Path.GetFileName(dir);
+
+                    var assetName = $"libunity.sym.so.{arch}";
+
+                    Console.WriteLine($"Uploading {assetName}");
+                    await using var assetStr = File.OpenRead(libunitySymPath);
                     await github.Repository.Release.UploadAsset(release, new(assetName, "application/x-msdownload", assetStr, TimeSpan.FromMinutes(10)));
                 }
 
