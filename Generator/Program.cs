@@ -46,8 +46,23 @@ internal static class Program
         
         http.DefaultRequestHeaders.Add("User-Agent", Config.UserAgent);
 
-        Console.WriteLine("Fetching available releases");
-        var versions = await GetAvailableVersionsAsync(latestBuildsOnly: false);
+        IEnumerable<UnityVersion> versions;
+
+        if (args.Length >= 4)
+        {
+            versions = args.Skip(3).Select(x =>
+            {
+                if (!UnityVersion.TryParse(x, x, out var ver))
+                    throw new ArgumentException($"Invalid version provided: {x}");
+
+                return ver;
+            }).ToArray();
+        }
+        else
+        {
+            Console.WriteLine("Fetching available releases");
+            versions = await GetAvailableVersionsAsync(latestBuildsOnly: false);
+        }
 
         Console.WriteLine("Fetching existing releases");
         var releases = await github.Repository.Release.GetAll(repoOwner, repoName);
