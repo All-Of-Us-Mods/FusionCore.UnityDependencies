@@ -4,7 +4,7 @@ namespace Generator;
 
 public static class SevenZip
 {
-    private static readonly string sevenZipPath = Path.Combine(Path.GetDirectoryName(Environment.ProcessPath)!, "Dependencies", "7zz");
+    private static readonly string sevenZipPath = Path.Combine(AppContext.BaseDirectory, "Dependencies", "7zz");
     
     public static async Task ExtractAsync(string archive, string outputDir, bool keepStructure, params string[] fileFilter)
     {

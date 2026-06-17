@@ -50,10 +50,22 @@ internal static class Program
 
         if (args.Length >= 4)
         {
+            var changesets = await GetUnityChangesetsAsync();
+           
             versions = args.Skip(3).Select(x =>
             {
                 if (!UnityVersion.TryParse(x, x, out var ver))
                     throw new ArgumentException($"Invalid version provided: {x}");
+
+                changesets.TryGetValue(x, out var changeset);
+                if (string.IsNullOrEmpty(changeset))
+                {
+                    Console.WriteLine($"No changeset found for version {x}");
+                }
+                else
+                {
+                    ver.Id = changeset;
+                }
 
                 return ver;
             }).ToArray();
@@ -240,6 +252,17 @@ internal static class Program
         }
 
         return result;
+    }
+
+    private static async Task<Dictionary<string, string>> GetUnityChangesetsAsync()
+    {
+        var resp = await http.GetAsync(Config.ChangesetDbUrl);
+        resp.EnsureSuccessStatusCode();
+
+        var respString = await resp.Content.ReadAsStringAsync();
+        var changesets = JsonSerializer.Deserialize<ChangesetResponse[]>(respString) ?? throw new Exception("Failed to deserialize changeset response.");
+        
+        return changesets.ToDictionary(x => x.Version, x => x.Changeset);
     }
 
     private static async Task<GetUnityReleasesResponse> GetUnityReleasesAsync(int limit, int skip)
